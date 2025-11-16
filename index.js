@@ -12,7 +12,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ¡Asegúrate de que esta sea tu contraseña!
-const MI_CONTRASENA_SECRETA = "tu-contraseña-secreta-aqui"; 
+const MI_CONTRASENA_SECRETA = "anguela200123"; 
 
 // === MODIFICACIÓN 2: Rutas Persistentes (para Render) ===
 // Render nos da un disco en '/var/data'
