@@ -1,0 +1,8 @@
+# Dependencias de Node
+node_modules
+
+# Archivos de la base de datos local
+nuestra_historia.db
+
+# Archivos de sistema
+.DS_Store

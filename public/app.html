@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuestra Línea de Tiempo</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00796b">
+</head>
+<body>
+
+    <header>
+        <h1>Nuestra Historia</h1>
+        <p>Un lugar para nuestros recuerdos</p>
+        
+        <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+        </header>
+
+    <main>
+        <section class="formulario-container">
+            <h2>Añadir un nuevo recuerdo</h2>
+            <form id="upload-form">
+                
+                <div class="form-group">
+                    <label for="evento-fecha">Fecha del Recuerdo:</label>
+                    <input type="date" id="evento-fecha" name="fecha" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="evento-descripcion">Descripción:</label>
+                    <textarea id="evento-descripcion" name="descripcion" rows="3" placeholder="¿Qué pasó ese día?" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="evento-foto">Sube una foto:</label>
+                    <input type="file" id="evento-foto" name="foto" accept="image/*" required>
+                </div>
+                
+                <button type="submit" class="btn-subir">Añadir a la línea de tiempo</button>
+            
+            </form>
+        </section>
+
+        <hr>
+
+        <section class="timeline-container">
+            <h2>Nuestra Línea de Tiempo</h2>
+            
+            <div id="timeline">
+                </div>
+        </section>
+    <main class="card">
+        
+    </main>
+    </main>
+
+    <script src="app.js"></script>
+
+</body>
+</html>

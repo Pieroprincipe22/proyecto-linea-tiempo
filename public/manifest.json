@@ -1,0 +1,21 @@
+{
+  "name": "Nuestra Historia",
+  "short_name": "Historia",
+  "description": "Una línea de tiempo de nuestros recuerdos.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#00796b",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
