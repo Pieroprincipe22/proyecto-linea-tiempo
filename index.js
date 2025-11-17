@@ -27,8 +27,8 @@ app.use(session({
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
-// === Configuración de la Base de Datos (¡MODIFICADA!) ===
-// ESTA ES LA LÍNEA NUEVA
+// === Configuración de la Base de Datos (v3) ===
+// (Esto ya debería estar bien por el paso anterior)
 const DB_FILE = path.join(DATA_DIR, 'nuestra_historia_v3.db');
 const db = new sqlite3.Database(DB_FILE, (err) => {
   if (err) { console.error(err.message); }
@@ -37,7 +37,6 @@ const db = new sqlite3.Database(DB_FILE, (err) => {
 
 db.run('PRAGMA foreign_keys = ON;');
 
-// ¡¡ACTUALIZADO!! Añadimos nombre y apellido
 db.run(`CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nombre TEXT NOT NULL,
@@ -89,10 +88,57 @@ app.get('/app', checkAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
 
-// ¡ESTA RUTA AÚN ESTÁ OBSOLETA! (La arreglaremos después)
+// === ¡RUTA DE LOGIN ARREGLADA! ===
 app.post('/login', (req, res) => {
-  console.warn('Intento de login fallido (Ruta antigua)');
-  res.redirect('/');
+  // 1. Obtenemos email y contraseña del formulario
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).send("Email y contraseña son requeridos.");
+  }
+
+  try {
+    // 2. Buscamos al usuario por su email
+    const sqlSelect = "SELECT * FROM usuarios WHERE email = ?";
+    db.get(sqlSelect, [email], async (err, row) => {
+      if (err) {
+        console.error("Error al buscar usuario:", err);
+        return res.status(500).send("Error del servidor.");
+      }
+      
+      if (!row) {
+        // Usuario no encontrado
+        console.warn(`Intento de login fallido: Email ${email} no encontrado.`);
+        return res.redirect('/');
+      }
+
+      // 3. ¡Usuario encontrado! Comparamos la contraseña
+      const isMatch = await bcrypt.compare(password, row.password_hash);
+
+      if (isMatch) {
+        // ¡Contraseña correcta!
+        console.log(`Inicio de sesión exitoso para: ${row.email}`);
+        
+        // 4. Creamos la sesión
+        req.session.user = { 
+          id: row.id, 
+          email: row.email, 
+          nombre: row.nombre 
+        };
+        
+        // 5. Lo redirigimos a la aplicación
+        res.redirect('/app');
+      } else {
+        // Contraseña incorrecta
+        console.warn(`Intento de login fallido: Contraseña incorrecta para ${email}.`);
+        return res.redirect('/');
+      }
+    });
+
+  } catch (error) {
+    console.error("Error en el login:", error);
+    res.status(500).send("Error interno del servidor.");
+  }
 });
 
 app.get('/logout', (req, res) => {
@@ -101,79 +147,135 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// === ¡RUTA DE REGISTRO ACTUALIZADA! ===
+// === ¡RUTA DE REGISTRO CON FLUJO CORREGIDO! ===
 app.post('/register', async (req, res) => {
-  // 1. Obtenemos TODOS los campos del formulario
   const { nombre, apellido, email, password, repetirContraseña } = req.body;
 
-  // 2. Validación
   if (!nombre || !apellido || !email || !password || !repetirContraseña) {
     return res.status(400).send("Todos los campos son requeridos.");
   }
-
   if (password !== repetirContraseña) {
-    console.warn('Intento de registro fallido: Las contraseñas no coinciden.');
     return res.redirect('/register.html'); 
   }
 
   try {
-    // 3. Revisamos si el email ya existe
     const sqlSelect = "SELECT * FROM usuarios WHERE email = ?";
     db.get(sqlSelect, [email], async (err, row) => {
-      if (err) {
-        console.error("Error al buscar usuario:", err);
-        return res.status(500).send("Error del servidor.");
-      }
-      
-      if (row) {
-        console.warn(`Intento de registro fallido: ${email} ya existe.`);
-        return res.redirect('/register.html'); // Devolver a registro
-      }
+      if (err) { return res.status(500).send("Error del servidor."); }
+      if (row) { return res.redirect('/register.html'); }
 
-      // 4. Encriptamos la contraseña
       const passwordHash = await bcrypt.hash(password, 10);
-
-      // 5. Guardamos el nuevo usuario
       const sqlInsert = `INSERT INTO usuarios (nombre, apellido, email, password_hash) 
                          VALUES (?, ?, ?, ?)`;
       db.run(sqlInsert, [nombre, apellido, email, passwordHash], function(err) {
-        if (err) {
-          console.error("Error al guardar usuario:", err);
-          return res.status(500).send("Error del servidor.");
-        }
+        if (err) { return res.status(500).send("Error del servidor."); }
         
-        const newUserId = this.lastID;
-        console.log(`Nuevo usuario creado: ${nombre} ${apellido} (ID: ${newUserId})`);
+        console.log(`Nuevo usuario creado: ${nombre} ${apellido}`);
 
-        // 6. Iniciamos su sesión
-        req.session.user = { id: newUserId, email: email, nombre: nombre };
-        
-        // 7. Lo redirigimos a la aplicación
-        res.redirect('/app');
+        // ¡¡CAMBIO!! Redirigimos al Login, como pediste.
+        res.redirect('/');
       });
     });
-
   } catch (error) {
-    console.error("Error en el registro:", error);
     res.status(500).send("Error interno del servidor.");
   }
 });
 // === Fin de la ruta de Registro ===
 
-// === Servir archivos estáticos ===
-// ¡¡¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA!!!
+// === Servir archivos estáticos (¡CORREGIDO!) ===
 app.use(express.static('public'));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 
-// === Rutas de la API (AÚN OBSOLETAS) ===
-app.use('/api', checkAuth);
-// ... (El resto de las rutas GET, POST, DELETE, PUT
-//     siguen aquí, pero aún no funcionan para multi-usuario) ...
-app.get('/api/recuerdos', (req, res) => { /* ... */ });
-app.post('/api/upload', upload.single('foto'), (req, res) => { /* ... */ });
-app.delete('/api/recuerdos/:id', (req, res) => { /* ... */ });
-app.put('/api/recuerdos/:id', (req, res) => { /* ... */ });
+// ===================================
+// === ¡RUTAS DE LA API ARREGLADAS! ===
+// ===================================
+app.use('/api', checkAuth); // El guardia protege toda la API
+
+// RUTA: LEER TODOS LOS RECUERDOS (¡ARREGLADA!)
+app.get('/api/recuerdos', (req, res) => {
+  // Obtenemos el ID del usuario de la sesión
+  const userId = req.session.user.id;
+
+  // Seleccionamos SOLO los recuerdos que pertenecen a ese usuario
+  const sql = `SELECT * FROM recuerdos WHERE user_id = ? ORDER BY fecha DESC`;
+  
+  db.all(sql, [userId], (err, rows) => {
+    if (err) { res.json({ success: false, message: err.message }); return; }
+    res.json({ success: true, recuerdos: rows });
+  });
+});
+
+// RUTA: AÑADIR UN NUEVO RECUERDO (¡ARREGLADA!)
+app.post('/api/upload', upload.single('foto'), (req, res) => {
+  // Obtenemos el ID del usuario de la sesión
+  const userId = req.session.user.id;
+  const { fecha, descripcion } = req.body;
+  const rutaFoto = '/uploads/' + req.file.filename;
+  
+  // Insertamos el recuerdo CON el user_id
+  const sql = `INSERT INTO recuerdos (fecha, descripcion, rutaFoto, user_id) 
+               VALUES (?, ?, ?, ?)`;
+               
+  db.run(sql, [fecha, descripcion, rutaFoto, userId], function(err) {
+    if (err) {
+        console.error("Error al guardar recuerdo:", err); 
+        res.json({ success: false, message: err.message }); 
+        return; 
+    }
+    res.json({ 
+        success: true, 
+        datos: { id: this.lastID, fecha, descripcion, rutaFoto } 
+    });
+  });
+});
+
+// RUTA: BORRAR UN RECUERDO (¡ARREGLADA Y SEGURA!)
+app.delete('/api/recuerdos/:id', (req, res) => {
+  const idRecuerdo = req.params.id;
+  const userId = req.session.user.id;
+
+  // Primero, buscamos la foto para borrar el archivo
+  const sqlSelect = "SELECT rutaFoto FROM recuerdos WHERE id = ? AND user_id = ?";
+  db.get(sqlSelect, [idRecuerdo, userId], (err, row) => {
+    if (err) { res.json({ success: false, message: err.message }); return; }
+    if (!row) { return res.json({ success: false, message: "No autorizado." }); }
+
+    // Borramos el registro (SOLO si el user_id coincide)
+    const sqlDelete = "DELETE FROM recuerdos WHERE id = ? AND user_id = ?";
+    db.run(sqlDelete, [idRecuerdo, userId], function(deleteErr) {
+      if (deleteErr) { res.json({ success: false, message: deleteErr.message }); return; }
+
+      // Borramos el archivo
+      const nombreArchivo = path.basename(row.rutaFoto);
+      const rutaFotoCompleta = path.join(UPLOADS_DIR, nombreArchivo);
+      fs.unlink(rutaFotoCompleta, (unlinkErr) => { /* ... (manejo de error) ... */ });
+      
+      res.json({ success: true, message: 'Recuerdo eliminado' });
+    });
+  });
+});
+
+// RUTA: ACTUALIZAR UN RECUERDO (¡ARREGLADA Y SEGURA!)
+app.put('/api/recuerdos/:id', (req, res) => {
+  const idRecuerdo = req.params.id;
+  const userId = req.session.user.id;
+  const { fecha, descripcion } = req.body;
+
+  // Actualizamos el recuerdo (SOLO si el user_id coincide)
+  const sql = `UPDATE recuerdos SET fecha = ?, descripcion = ? 
+               WHERE id = ? AND user_id = ?`;
+               
+  db.run(sql, [fecha, descripcion, idRecuerdo, userId], function(err) {
+    if (err) { res.json({ success: false, message: err.message }); return; }
+    
+    // this.changes te dirá si algo se actualizó.
+    if (this.changes === 0) {
+        return res.json({ success: false, message: "No autorizado o no encontrado." });
+    }
+    res.json({ success: true, message: 'Recuerdo actualizado con éxito.' });
+  });
+});
 // === Fin Rutas de la API ===
 
 // Iniciar el servidor
