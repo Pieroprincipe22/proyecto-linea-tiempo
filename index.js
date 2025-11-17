@@ -75,7 +75,7 @@ function checkAuth(req, res, next) {
 }
 // === Fin Middleware "Guardia" ===
 
-// === Rutas de Login/Logout (Sin cambios por ahora) ===
+// === Rutas de Login/Logout ===
 app.get('/', (req, res) => {
   if (req.session.user) {
     res.redirect('/app');
@@ -111,8 +111,6 @@ app.post('/register', async (req, res) => {
   }
 
   if (password !== repetirContraseña) {
-    // ¡Las contraseñas no coinciden!
-    // (Idealmente, mostraríamos este error en el HTML)
     console.warn('Intento de registro fallido: Las contraseñas no coinciden.');
     return res.redirect('/register.html'); 
   }
@@ -127,7 +125,6 @@ app.post('/register', async (req, res) => {
       }
       
       if (row) {
-        // ¡Usuario ya existe!
         console.warn(`Intento de registro fallido: ${email} ya existe.`);
         return res.redirect('/register.html'); // Devolver a registro
       }
@@ -135,7 +132,7 @@ app.post('/register', async (req, res) => {
       // 4. Encriptamos la contraseña
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // 5. Guardamos el nuevo usuario (CON LOS NUEVOS CAMPOS)
+      // 5. Guardamos el nuevo usuario
       const sqlInsert = `INSERT INTO usuarios (nombre, apellido, email, password_hash) 
                          VALUES (?, ?, ?, ?)`;
       db.run(sqlInsert, [nombre, apellido, email, passwordHash], function(err) {
@@ -161,6 +158,12 @@ app.post('/register', async (req, res) => {
   }
 });
 // === Fin de la ruta de Registro ===
+
+// === Servir archivos estáticos ===
+// ¡¡¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA!!!
+app.use(express.static('public'));
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 
 // === Rutas de la API (AÚN OBSOLETAS) ===
 app.use('/api', checkAuth);
