@@ -4,7 +4,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const session = require('express-session');
-const bcrypt = require('bcrypt'); // <-- AÑADIDO EN PASO 1
+const bcrypt = require('bcrypt'); // Importamos bcrypt
 
 const app = express();
 
@@ -12,7 +12,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // === Variables de Entorno (¡LEÍDAS DESDE RENDER!) ===
-const MI_CONTRASENA_SECRETA = process.env.MI_CONTRASENA_SECRETA;
+const MI_CONTRASENA_SECRETA = process.env.MI_CONTRASENA_SECRETA; // (Esta ya casi no se usa)
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
 // === Rutas Persistentes (para Render) ===
@@ -38,26 +38,21 @@ app.use(session({
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
-// =========================================================
-// === PASO 2: Configuración de la Base de Datos (MULTI-USUARIO) ===
-// =========================================================
-const DB_FILE = path.join(DATA_DIR, 'nuestra_historia_v2.db'); // v2 para la nueva DB
+// === Configuración de la Base de Datos (MULTI-USUARIO) ===
+const DB_FILE = path.join(DATA_DIR, 'nuestra_historia_v2.db');
 const db = new sqlite3.Database(DB_FILE, (err) => {
   if (err) { console.error(err.message); }
   console.log(`Conectado a la base de datos en: ${DB_FILE}`);
 });
 
-// Habilitamos las Foreign Keys para SQLite
 db.run('PRAGMA foreign_keys = ON;');
 
-// 2. Creamos la NUEVA tabla de usuarios
 db.run(`CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL
 )`);
 
-// 3. Modificamos la tabla recuerdos para AÑADIR el 'user_id'
 db.run(`CREATE TABLE IF NOT EXISTS recuerdos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fecha TEXT NOT NULL,
@@ -69,7 +64,7 @@ db.run(`CREATE TABLE IF NOT EXISTS recuerdos (
 // === Fin Configuración de la Base de Datos ===
 
 
-// === Configuración de Multer (Usa la nueva ruta) ===
+// === Configuración de Multer (Sin cambios) ===
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOADS_DIR); 
@@ -84,9 +79,7 @@ const upload = multer({ storage: storage });
 
 // === Middleware "Guardia" de Autenticación ===
 function checkAuth(req, res, next) {
-  // AHORA revisamos req.session.userId (que lo crearemos al loguear)
-  // (Este guardia sigue funcionando conceptualmente)
-  if (req.session.user) { // <-- Mantendremos 'user' por ahora
+  if (req.session.user) {
     next();
   } else {
     res.redirect('/');
@@ -107,7 +100,7 @@ app.get('/app', checkAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
 
-// ¡¡¡ESTA RUTA AHORA ESTÁ OBSOLETA!!! (La arreglaremos después)
+// ¡ESTA RUTA AHORA ESTÁ OBSOLETA! (La arreglaremos en el Paso 5)
 app.post('/login', (req, res) => {
   if (req.body.password === MI_CONTRASENA_SECRETA) {
     req.session.user = { loggedIn: true }; // <-- Esto lo cambiaremos
@@ -123,6 +116,62 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
   });
 });
+
+// === ¡NUEVO! RUTA DE REGISTRO (POST /register) - PASO 4 ===
+app.post('/register', async (req, res) => {
+  // 1. Obtenemos el email y la contraseña del formulario
+  const email = req.body.email;
+  const password = req.body.password;
+
+  if (!email || !password) {
+    return res.status(400).send("Email y contraseña son requeridos.");
+  }
+
+  try {
+    // 2. Revisamos si el email ya existe
+    const sqlSelect = "SELECT * FROM usuarios WHERE email = ?";
+    db.get(sqlSelect, [email], async (err, row) => {
+      if (err) {
+        console.error("Error al buscar usuario:", err);
+        return res.status(500).send("Error del servidor al registrar.");
+      }
+      
+      if (row) {
+        // ¡Usuario ya existe!
+        console.warn(`Intento de registro fallido: ${email} ya existe.`);
+        return res.redirect('/'); 
+      }
+
+      // 3. ¡Email disponible! Encriptamos la contraseña
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // 4. Guardamos el nuevo usuario en la base de datos
+      const sqlInsert = "INSERT INTO usuarios (email, password_hash) VALUES (?, ?)";
+      db.run(sqlInsert, [email, passwordHash], function(err) {
+        if (err) {
+          console.error("Error al guardar usuario:", err);
+          return res.status(500).send("Error del servidor al guardar.");
+        }
+        
+        const newUserId = this.lastID;
+        console.log(`Nuevo usuario creado con ID: ${newUserId} y email: ${email}`);
+
+        // 5. ¡Registro exitoso! Iniciamos su sesión
+        //    Guardamos su ID y email en la sesión
+        req.session.user = { id: newUserId, email: email };
+        
+        // 6. Lo redirigimos a la aplicación
+        res.redirect('/app');
+      });
+    });
+
+  } catch (error) {
+    console.error("Error en el registro:", error);
+    res.status(500).send("Error interno del servidor.");
+  }
+});
+// === Fin de la ruta de Registro ===
+
 // === Fin Rutas de Login/Logout ===
 
 
@@ -132,13 +181,11 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 
 
 // === Rutas de la API (¡PROTEGIDAS!) ===
-// ¡¡¡ESTAS RUTAS ESTÁN OBSOLETAS!!! (Las arreglaremos después)
+// ¡¡¡ESTAS RUTAS AÚN NO ESTÁN LISTAS PARA MULTI-USUARIO!!!
 app.use('/api', checkAuth);
 
 // RUTA: LEER TODOS LOS RECUERDOS (GET /api/recuerdos)
 app.get('/api/recuerdos', (req, res) => {
-  // Esta ruta ahora está MAL, porque muestra los recuerdos de TODOS.
-  // La arreglaremos para que solo muestre los del user_id de la sesión.
   const sql = `SELECT * FROM recuerdos ORDER BY fecha DESC`;
   db.all(sql, [], (err, rows) => {
     if (err) { res.json({ success: false, message: err.message }); return; }
@@ -148,10 +195,12 @@ app.get('/api/recuerdos', (req, res) => {
 
 // RUTA: AÑADIR UN NUEVO RECUERDO (POST /api/upload)
 app.post('/api/upload', upload.single('foto'), (req, res) => {
-  // Esta ruta está MAL, no guarda el user_id.
   const fecha = req.body.fecha;
   const descripcion = req.body.descripcion;
+  
+  // === ¡LÍNEA CORREGIDA! ===
   const rutaFoto = '/uploads/' + req.file.filename;
+  
   const sql = `INSERT INTO recuerdos (fecha, descripcion, rutaFoto) VALUES (?, ?, ?)`;
   db.run(sql, [fecha, descripcion, rutaFoto], function(err) {
     if (err) { res.json({ success: false, message: err.message }); return; }
@@ -177,7 +226,7 @@ app.put('/api/recuerdos/:id', (req, res) => {
 });
 // === Fin Rutas de la API ===
 
-// Iniciar el servidor (Usa la variable 'port' de Render)
+// Iniciar el servidor
 app.listen(port, () => {
   console.log(`Servidor escuchando en http://localhost:${port}`);
 });
