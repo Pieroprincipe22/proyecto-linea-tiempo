@@ -28,7 +28,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // === Configuración de la Base de Datos (¡MODIFICADA!) ===
-const DB_FILE = path.join(DATA_DIR, 'nuestra_historia_v2.db');
+// ESTA ES LA LÍNEA NUEVA
+const DB_FILE = path.join(DATA_DIR, 'nuestra_historia_v3.db');
 const db = new sqlite3.Database(DB_FILE, (err) => {
   if (err) { console.error(err.message); }
   console.log(`Conectado a la base de datos en: ${DB_FILE}`);
