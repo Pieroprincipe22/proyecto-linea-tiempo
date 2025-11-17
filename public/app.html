@@ -4,20 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nuestra Línea de Tiempo</title>
-    <link rel="stylesheet" href="style.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    
     <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#00796b">
+    <meta name="theme-color" content="#D9AFA0"> <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
         <h1>Nuestra Historia</h1>
-        <p>Un lugar para nuestros recuerdos</p>
-        
         <a href="/logout" class="btn-logout">Cerrar Sesión</a>
-        </header>
+    </header>
 
-    <main>
+    <main class="card">
+        
         <section class="formulario-container">
             <h2>Añadir un nuevo recuerdo</h2>
             <form id="upload-form">
@@ -50,12 +53,8 @@
             <div id="timeline">
                 </div>
         </section>
-    <main class="card">
-        
     </main>
-    </main>
-
+    
     <script src="app.js"></script>
-
 </body>
 </html>
